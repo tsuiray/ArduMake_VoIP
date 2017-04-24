@@ -13,21 +13,39 @@ void TaskPlayVoice( void *pvParameters );
 #define TEST_PIN 4
 #define AUDIO_IN  A0
 #define SPK_PIN 11
-
-unsigned char Aud_Buf[480] = {0};//20ms has 160's sample in 8KHz sampling
+#define AUD_BUF_SIZE 500
+unsigned char Aud_Buf[AUD_BUF_SIZE] = {0};//20ms has 160's sample in 8KHz sampling
 unsigned char* Aud_Buf_Org = &Aud_Buf[0];
 unsigned char* Aud_Buf_Cur = &Aud_Buf[0];
 unsigned char* Aud_Buf_Read = &Aud_Buf[0];
+
+//uint8_t* Aud_Buf_Org = (uint8_t*)malloc(AUD_BUF_SIZE);
+//uint8_t* Aud_Buf_Cur = Aud_Buf_Org;
+//uint8_t* Aud_Buf_Read = Aud_Buf_Org;
 
 unsigned char const *sounddata_data=0;
 int sounddata_length=0;
 volatile uint16_t sample;
 byte lastSample;
 uint8_t tToggle=0;
-uint8_t aud_buf =0;
+unsigned char aud_buf =0;
 uint8_t* Aud_Buf_Cur_2 = &aud_buf;
+uint16_t audio_i = 0;
 ISR(TIMER1_COMPA_vect) {
 
+  
+  tToggle = !tToggle;
+  digitalWrite(TEST_PIN,tToggle);
+  aud_buf = analogRead(AUDIO_IN)/4;
+  //*Aud_Buf_Cur = (uint8_t)analogRead(AUDIO_IN)/4;
+  //Aud_Buf_Cur++;
+  //if ((Aud_Buf_Cur - Aud_Buf_Org) >= AUD_BUF_SIZE)
+  //{
+  //  Aud_Buf_Cur = Aud_Buf_Org;
+  //}
+  OCR2A = aud_buf;
+#if 0
+  ++sample;
   if (sample >= sounddata_length) {
     if (sample == sounddata_length + lastSample) {
       stopPlayback();
@@ -41,14 +59,7 @@ ISR(TIMER1_COMPA_vect) {
   else {
     OCR2A = pgm_read_byte(&sounddata_data[sample]);
   }
-  
-  ++sample;
-  tToggle = !tToggle;
-  digitalWrite(TEST_PIN,tToggle);
-  aud_buf = analogRead(AUDIO_IN)/4;
-  *Aud_Buf_Cur_2 = aud_buf;
-  //*Aud_Buf_Cur++;
-
+#endif
 }
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -77,7 +88,7 @@ void setup() {
 
   xTaskCreate(
     TaskAudioGet
-    ,  (const portCHAR *) "AnalogRead"
+    ,  (const portCHAR *) "AudioGet"
     ,  128  // Stack size
     ,  NULL
     ,  1  // Priority
@@ -86,7 +97,7 @@ void setup() {
   xTaskCreate(
     TaskPlayVoice
     ,  (const portCHAR *) "PlayVoice"
-    ,  256  // Stack size
+    ,  128  // Stack size
     ,  NULL
     ,  3  // Priority
     ,  NULL );
@@ -156,6 +167,7 @@ void TaskAudioGet(void *pvParameters)  // This is a task.
 {
   (void) pvParameters;
   pinMode(TEST_PIN,OUTPUT);
+  uint16_t Diff =0;
 /*
   AnalogReadSerial
   Reads an analog input on pin 0, prints the result to the serial monitor.
@@ -170,7 +182,16 @@ void TaskAudioGet(void *pvParameters)  // This is a task.
     // read the input on analog pin 0:
     //int sensorValue = analogRead(A1);
     // print out the value you read:
-    Serial.println(aud_buf);
+    if ((Aud_Buf_Cur - Aud_Buf_Org) > 0)
+    {
+        Diff = Aud_Buf_Cur - Aud_Buf_Org;
+        Aud_Buf_Cur = Aud_Buf_Org;
+        //Serial.print("Diff:");
+        Serial.println(Diff);
+        //memcpy()
+    }
+    
+    //Serial.println(aud_buf);
     vTaskDelay(1);  // one tick delay (15ms) in between reads for stability
   }
 }
